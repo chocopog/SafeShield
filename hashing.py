@@ -11,8 +11,12 @@ def GetFileHash(path):
                         break
                     sha256_hash.update(chunk)
         return sha256_hash.hexdigest()
-    except Exception as e:
-         print(f"(could not hash file: {e})")
-    return None
+    except FileNotFoundError:
+        return None
+    except PermissionError:
+        return None
+    except OSError as e:
+        print(f"Could not read file: {e}")
+        return None
 
      
