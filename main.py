@@ -14,7 +14,7 @@ def RiskAnalyzer(is_danger_ext, is_double_ext, sig_status, vt_status):
             score += score_danger_ext
     if is_double_ext:
         score += score_double_ext
-    if sig_status.startswith("N/A"):
+    if sig_status and sig_status.startswith("N/A"):
         pass
     elif "Valid" not in sig_status:
         score+= score_invalid_signature
@@ -28,60 +28,61 @@ def RiskAnalyzer(is_danger_ext, is_double_ext, sig_status, vt_status):
             return label
     return "Extreme"
 
-def analyzeFolder(folderpath):
+def analyzeFolder(folderpath, output = print):
     results = []
     for root, _, files in os.walk(folderpath):
         for filename in files:
             filepath = os.path.join(root, filename)
-            risk_level = analyzeFile(filepath)
+            risk_level = analyzeFile(filepath, output=output)
             results.append((filename, risk_level))
 
-    print("\nBatch results")
+    output("\nBatch results")
     for filename, risk_level in results:
-        print(f"{filename}: {risk_level if risk_level else 'Error'}")
+        output(f"{filename}: {risk_level if risk_level else 'Error'}")
     return results
 
 
 
-def analyzeFile(filepath):
-    print("\n--- File Analyzer ---")
+def analyzeFile(filepath, output = print):
+    output("\n--- File Analyzer ---")
 
     if not os.path.exists(filepath):
-        print("Error, file not found")
+        output("Error, file not found")
         return
     if not os.path.isfile(filepath):
-        print("Error, path is not a file")
+        output("Error, path is not a file")
         return
     filename = os.path.basename(filepath)
     isDoubleExt = CheckDoubleExtension(filename)
 
-    print("\n Scanning...")
-    print(f"File: {filename}")
-    print(f"Size: {os.path.getsize(filepath)} bytes")
-    print(f"Double extension: {'DETECTED!!' if isDoubleExt else 'None'}")
-    print(f"Dangerous file type: {'Yes' if isDangerExt(filename) else 'No'}")
+    output("\n Scanning...")
+    output(f"File: {filename}")
+    output(f"Size: {os.path.getsize(filepath)} bytes")
+    output(f"Double extension: {'DETECTED!!' if isDoubleExt else 'None'}")
+    output(f"Dangerous file type: {'Yes' if isDangerExt(filename) else 'No'}")
     
 
     file_hash = GetFileHash(filepath)
-    print(f"SHA-256 hash: {file_hash if file_hash else 'Could not compute!'}")
+    output(f"SHA-256 hash: {file_hash if file_hash else 'Could not compute!'}")
 
     sig_status = checksig(filepath)
-    print(f"Digital signature status: {sig_status}")
+    output(f"Digital signature status: {sig_status}")
 
     if file_hash:
         vt_status = checkVirusTotal(file_hash, 2)
     else: 
         vt_status = "Skipped, no hash available"
-    print(f"Global threat DB: {vt_status}")
+    output(f"Global threat DB: {vt_status}")
 
     risk_level = RiskAnalyzer(isDangerExt(filename), isDoubleExt, sig_status, vt_status)
-    print(f"\nOverall Risk Level: {risk_level}")
+    output(f"\nOverall Risk Level: {risk_level}")
 
-    print("\nDone. This tool only reads and reports; no files were changed.")
+    output("\nDone. This tool only reads and reports; no files were changed.")
     return risk_level
+if __name__ == "__main__":
+    path = input("Please enter file or folder path:   ").strip().strip('"')
 
-path = input("Please enter file or folder path:   ").strip().strip('"')
-if os.path.isdir(path):
-    analyzeFolder(path)
-else:
-    analyzeFile(path)
+    if os.path.isdir(path):
+        analyzeFolder(path)
+    else:
+        analyzeFile(path)

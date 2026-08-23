@@ -9,3 +9,11 @@ Risk_threshold = [
     (2, "Medium"),
     (5, "High")
 ]
+
+Risk_colors = {
+    "Low": "#2e7d32",      
+    "Medium": "#f9a825",   
+    "High": "#ef6c00",      
+    "Extreme": "#c62828"    
+}
+Risk_order = ["Low", "Medium", "High", "Extreme"]
