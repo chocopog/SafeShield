@@ -21,10 +21,22 @@ def checkVT(filehash, retries=1):
     }
 
     for attempt in range(retries + 1):
-        res = requests.get(url, headers=headers, timeout=15)
+        try:
+            res = requests.get(url, headers=headers, timeout=15)
+        except requests.exceptions.Timeout:
+            if attempt < retries:
+                continue
+            return "Error: VirusTotal request timed out"
+        except requests.exceptions.RequestException as err:
+            return f"Error: VirusTotal request failed ({err})"
+
         if res.status_code == 200:
-            data = res.json()
-            stats = data["data"]["attributes"]["last_analysis_stats"]
+            try:
+                data = res.json()
+                stats = data["data"]["attributes"]["last_analysis_stats"]
+            except (ValueError, KeyError, TypeError):
+                return "Error: invalid response from VirusTotal"
+
             bad = stats.get("malicious", 0)
             sus = stats.get("suspicious", 0)
             if bad or sus > 0:

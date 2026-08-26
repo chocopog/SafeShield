@@ -30,10 +30,17 @@ def riskAnalyze(isDangerous, isDouble, sigStatus, vtStatus):
 
 def analyzeFolder(folderPath, output=print):
     results = []
-    for root, _, files in os.walk(folderPath):
+    def reportWalkError(error):
+        output(f"Error reading folder: {error}")
+
+    for root, _, files in os.walk(folderPath, onerror=reportWalkError):
         for name in files:
             filePath = os.path.join(root, name)
-            risk = analyzeFile(filePath, output=output)
+            try:
+                risk = analyzeFile(filePath, output=output)
+            except OSError as error:
+                output(f"Error scanning {name}: {error}")
+                risk = None
             results.append((name, risk))
 
     output("\nBatch results")
@@ -57,7 +64,13 @@ def analyzeFile(filePath, output=print):
 
     output("\n Scanning...")
     output(f"File: {name}")
-    output(f"Size: {os.path.getsize(filePath)} bytes")
+    try:
+        fileSize = os.path.getsize(filePath)
+    except OSError as error:
+        output(f"Error, could not read file metadata: {error}")
+        return
+
+    output(f"Size: {fileSize} bytes")
     output(f"Double extension: {'DETECTED!!' if isDouble else 'None'}")
     output(f"Dangerous file type: {'Yes' if isDangerExt(name) else 'No'}")
     
