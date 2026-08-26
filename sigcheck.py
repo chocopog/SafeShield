@@ -8,14 +8,14 @@ def checksig(path):
         return "NA, signature check only works on windows systems"
     psCmd = f"(Get-AuthenticodeSignature '{path}').Status.ToString()"
     try:
-        result = subprocess.run(
+        res = subprocess.run(
             ["powershell", "-Command", psCmd],
             capture_output=True,
             text=True,
             timeout=15,
             creationflags=subprocess.CREATE_NO_WINDOW
         )
-        output = result.stdout.strip()
+        output = res.stdout.strip()
         return output if output else "Unknown"
     except subprocess.TimeoutExpired:
         return "Error: signature check took too long"

@@ -1,84 +1,84 @@
-from hashing import GetFileHash
+from hashing import getHash
 from sigcheck import checksig
-from virustotalcheck import checkVirusTotal
-from extensioncheck import CheckDoubleExtension, isDangerExt
-from config import score_danger_ext, score_double_ext, score_invalid_signature, score_VT_flag, score_VT_unknown, Risk_threshold
+from virustotalcheck import checkVT
+from extensioncheck import checkDouble, isDangerExt
+from config import dangerScore, doubleScore, sigScore, vtFlagScore, vtUnknownScore, riskThresholds
 
 import os
-def RiskAnalyzer(is_danger_ext, is_double_ext, sig_status, vt_status):
+def riskAnalyze(isDangerous, isDouble, sigStatus, vtStatus):
     score = 0
-    if is_danger_ext:
-        if sig_status=="Valid":
+    if isDangerous:
+        if sigStatus=="Valid":
             pass
         else:
-            score += score_danger_ext
-    if is_double_ext:
-        score += score_double_ext
-    if sig_status and sig_status.startswith("N/A"):
+            score += dangerScore
+    if isDouble:
+        score += doubleScore
+    if sigStatus and sigStatus.startswith("N/A"):
         pass
-    elif "Valid" not in sig_status:
-        score+= score_invalid_signature
-    if "Flagged" in vt_status:
-        score+=score_VT_flag
-    elif "Unknown file" in vt_status:
-        score+= score_VT_unknown
+    elif "Valid" not in sigStatus:
+        score+= sigScore
+    if "Flagged" in vtStatus:
+        score+=vtFlagScore
+    elif "Unknown file" in vtStatus:
+        score+= vtUnknownScore
     
-    for m_score, label in Risk_threshold:
-        if score <= m_score:
+    for maxScore, label in riskThresholds:
+        if score <= maxScore:
             return label
     return "Extreme"
 
-def analyzeFolder(folderpath, output = print):
+def analyzeFolder(folderPath, output=print):
     results = []
-    for root, _, files in os.walk(folderpath):
-        for filename in files:
-            filepath = os.path.join(root, filename)
-            risk_level = analyzeFile(filepath, output=output)
-            results.append((filename, risk_level))
+    for root, _, files in os.walk(folderPath):
+        for name in files:
+            filePath = os.path.join(root, name)
+            risk = analyzeFile(filePath, output=output)
+            results.append((name, risk))
 
     output("\nBatch results")
-    for filename, risk_level in results:
-        output(f"{filename}: {risk_level if risk_level else 'Error'}")
+    for name, risk in results:
+        output(f"{name}: {risk if risk else 'Error'}")
     return results
 
 
 
-def analyzeFile(filepath, output = print):
+def analyzeFile(filePath, output=print):
     output("\n--- File Analyzer ---")
 
-    if not os.path.exists(filepath):
+    if not os.path.exists(filePath):
         output("Error, file not found")
         return
-    if not os.path.isfile(filepath):
+    if not os.path.isfile(filePath):
         output("Error, path is not a file")
         return
-    filename = os.path.basename(filepath)
-    isDoubleExt = CheckDoubleExtension(filename)
+    name = os.path.basename(filePath)
+    isDouble = checkDouble(name)
 
     output("\n Scanning...")
-    output(f"File: {filename}")
-    output(f"Size: {os.path.getsize(filepath)} bytes")
-    output(f"Double extension: {'DETECTED!!' if isDoubleExt else 'None'}")
-    output(f"Dangerous file type: {'Yes' if isDangerExt(filename) else 'No'}")
+    output(f"File: {name}")
+    output(f"Size: {os.path.getsize(filePath)} bytes")
+    output(f"Double extension: {'DETECTED!!' if isDouble else 'None'}")
+    output(f"Dangerous file type: {'Yes' if isDangerExt(name) else 'No'}")
     
 
-    file_hash = GetFileHash(filepath)
-    output(f"SHA-256 hash: {file_hash if file_hash else 'Could not compute!'}")
+    filehash = getHash(filePath)
+    output(f"SHA-256 hash: {filehash if filehash else 'Could not compute!'}")
 
-    sig_status = checksig(filepath)
-    output(f"Digital signature status: {sig_status}")
+    sigStatus = checksig(filePath)
+    output(f"Digital signature status: {sigStatus}")
 
-    if file_hash:
-        vt_status = checkVirusTotal(file_hash, 2)
+    if filehash:
+        vtStatus = checkVT(filehash, 2)
     else: 
-        vt_status = "Skipped, no hash available"
-    output(f"Global threat DB: {vt_status}")
+        vtStatus = "Skipped, no hash available"
+    output(f"Global threat DB: {vtStatus}")
 
-    risk_level = RiskAnalyzer(isDangerExt(filename), isDoubleExt, sig_status, vt_status)
-    output(f"\nOverall Risk Level: {risk_level}")
+    riskLevel = riskAnalyze(isDangerExt(name), isDouble, sigStatus, vtStatus)
+    output(f"\nOverall Risk Level: {riskLevel}")
 
     output("\nDone. This tool only reads and reports; no files were changed.")
-    return risk_level
+    return riskLevel
 if __name__ == "__main__":
     path = input("Please enter file or folder path:   ").strip().strip('"')
 

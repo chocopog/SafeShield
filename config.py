@@ -1,19 +1,19 @@
-score_danger_ext = 1
-score_double_ext = 2
-score_invalid_signature = 2
-score_VT_flag = 3
-score_VT_unknown = 1
+dangerScore = 1
+doubleScore = 2
+sigScore = 2
+vtFlagScore = 3
+vtUnknownScore = 1
 
-Risk_threshold = [
+riskThresholds = [
     (0, "Low"),
     (2, "Medium"),
     (5, "High")
 ]
 
-Risk_colors = {
+riskColors = {
     "Low": "#2e7d32",      
     "Medium": "#f9a825",   
     "High": "#ef6c00",      
     "Extreme": "#c62828"    
 }
-Risk_order = ["Low", "Medium", "High", "Extreme"]
+riskOrder = ["Low", "Medium", "High", "Extreme"]

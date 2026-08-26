@@ -1,49 +1,42 @@
+import os
 import time
-import json
+
 import requests
 from dotenv import load_dotenv
-import os
 
-from dotenv import load_dotenv
-import os
+envPath = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+load_dotenv(dotenv_path=envPath)
 
-env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
-load_dotenv(dotenv_path=env_path)
+vtKey = os.getenv("VT_API_KEY")
 
-VT_API_KEY = os.getenv("VT_API_KEY")
 
-def checkVirusTotal(file_hash,retries=1):
-    if not VT_API_KEY:
+def checkVT(filehash, retries=1):
+    if not vtKey:
         return "Skipped (NO API KEY)"
-    url = f"https://www.virustotal.com/api/v3/files/{file_hash}"
+
+    url = f"https://www.virustotal.com/api/v3/files/{filehash}"
     headers = {
-    "accept": "application/json",
-    "x-apikey": VT_API_KEY
+        "accept": "application/json",
+        "x-apikey": vtKey,
     }
-    for attempt in range(retries+1):
-            response = requests.get(url, headers=headers, timeout=15)
-            if response.status_code == 200:
-                 data = response.json()
-                 stats = data["data"]["attributes"]["last_analysis_stats"]
 
-                 malicious = stats.get("malicious", 0)
-                 sus = stats.get("suspicious", 0)
-                 
-                 #might not work since its a premium API feature
-                 severity_level = stats.get("")
+    for attempt in range(retries + 1):
+        res = requests.get(url, headers=headers, timeout=15)
+        if res.status_code == 200:
+            data = res.json()
+            stats = data["data"]["attributes"]["last_analysis_stats"]
+            bad = stats.get("malicious", 0)
+            sus = stats.get("suspicious", 0)
+            if bad or sus > 0:
+                return f"Flagged, {bad} malicious, {sus}, suspicious"
+            return "Clean"
+        if res.status_code == 404:
+            return "Unknown file(not found in global database, please proceed with caution)"
+        if res.status_code == 429:
+            if attempt < retries:
+                time.sleep(15)
+                continue
+            return "Error: time limit reached, please try again later"
+        return f"Error: {res.status_code}"
 
-                 if malicious or sus >0:
-                      return f"Flagged, {malicious} malicious, {sus}, suspicious"
-                 else:
-                      return "Clean"
-            elif response.status_code==404:
-                 return "Unknown file(not found in global database, please proceed with caution)"
-            elif response.status_code==429:
-                 if attempt<retries:
-                      time.sleep(15)
-                      continue
-                 return "Error: time limit reached, please try again later"
-            else: 
-                 return f"Error: {response.status_code}"
     return "Error: could not complete request"
-            
