@@ -6,7 +6,8 @@ def checksig(path):
         return "N/A Not an exe"
     if platform.system() != "Windows":
         return "NA, signature check only works on windows systems"
-    psCmd = f"(Get-AuthenticodeSignature '{path}').Status.ToString()"
+    safePath = path.replace("'", "''")
+    psCmd = f"(Get-AuthenticodeSignature '{safePath}').Status.ToString()"
     try:
         res = subprocess.run(
             ["powershell", "-Command", psCmd],
