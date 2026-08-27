@@ -5,7 +5,7 @@ vtFlagScore = 3
 vtUnknownScore = 1
 
 riskThresholds = [
-    (0, "Low"),
+    (1, "Low"),
     (2, "Medium"),
     (5, "High")
 ]

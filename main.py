@@ -76,7 +76,7 @@ def analyzeFile(filePath, output=print):
     
 
     filehash = getHash(filePath)
-    output(f"SHA-256 hash: {filehash if filehash else 'Could not compute!'}")
+    output(f"SHA-256 hash: {filehash if filehash else 'Could not compute :( '}")
 
     sigStatus = checksig(filePath)
     output(f"Digital signature status: {sigStatus}")

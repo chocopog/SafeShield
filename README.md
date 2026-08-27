@@ -14,13 +14,17 @@ A simple Python command-line tool that analyzes a file and reports how risky it 
 ## Project structure
 
 ```
-main.py             # entry point, runs the full scan pipeline
+main.py             # CLI entry point and scan pipeline
+gui.py              # Tkinter graphical interface
 hashing.py          # SHA-256 hashing
-extensioncheck.py   # extension and double-extension checks
+extensioncheck.py   # dangerous-extension and double-extension checks
 sigcheck.py         # Windows digital signature check
 virustotalcheck.py  # VirusTotal API lookup
-.env                # holds your VirusTotal API key (you create this, not included in repo)
+config.py           # risk scores, thresholds, and GUI colors
+.env                # local VirusTotal API key (create this; do not commit it)
 ```
+
+`learningtkinter.py` is a local learning file and is excluded by `.gitignore`.
 
 ## Setup
 
@@ -33,7 +37,7 @@ pip install requests python-dotenv
 ### 2. Get a free VirusTotal API key
 
 1. Go to [virustotal.com](https://www.virustotal.com) and create a free account
-2. Click your profile icon (top right) → **API Key**
+2. Click your profile icon (top right) and open **API Key**
 3. Copy the key shown there
 
 The free tier is limited to about 4 requests per minute, which is plenty for scanning files one at a time.
@@ -50,15 +54,23 @@ No quotes, no spaces around the `=`. Never commit this file to GitHub, it should
 
 ## Usage
 
-Run the script and enter a file path when prompted:
+Run the command-line scanner and enter a file or folder path when prompted:
 
 ```
 python main.py
 ```
 
 ```
-Please enter file path: C:\Users\you\Downloads\somefile.exe
+Please enter file or folder path: C:\Users\you\Downloads\somefile.exe
 ```
+
+To use the graphical interface instead:
+
+```
+python gui.py
+```
+
+Choose a file or folder, then select **Start scan**. A folder scan displays the risk level for each file and the highest risk level found.
 
 Example output:
 
@@ -84,3 +96,18 @@ Done. This tool only reads and reports; no files were changed.
 - The digital signature check only works on Windows, since it relies on PowerShell's `Get-AuthenticodeSignature` cmdlet
 - This tool is read-only: it never deletes, moves, quarantines, or modifies any file it scans
 - A "Low" risk result doesn't guarantee a file is safe, it just means none of the checks above found anything suspicious
+- VirusTotal lookups are skipped when `VT_API_KEY` is missing
+- VirusTotal timeouts, connection failures, rate limits, invalid responses, and unexpected status codes are reported without stopping the whole scan
+- If a file cannot be read, hashed, or inspected, the scanner reports the problem and continues with the next file during a folder scan
+
+## Risk scoring
+
+The scanner adds points for suspicious indicators:
+
+- Dangerous file extension: 1 point, unless the executable has a valid signature
+- Double extension: 2 points
+- Missing or invalid executable signature: 2 points
+- VirusTotal flagged result: 3 points
+- VirusTotal unknown result: 1 point
+
+The total score is reported as **Low** (0–1), **Medium** (2), **High** (3–5), or **Extreme** (6 or more).
