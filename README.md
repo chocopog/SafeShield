@@ -1,76 +1,112 @@
 # SafeShield File Analyzer
 
-A simple Python command-line tool that analyzes a file and reports how risky it might be, without ever modifying, moving, or deleting anything. It's a read-only security scanner built for a college cybersecurity internship assignment.
+SafeShield is a read-only Python file-analysis tool. It combines filename checks, SHA-256 hashing, Windows Authenticode signature checks, and a VirusTotal hash lookup into an overall risk rating. It never modifies, deletes, moves, quarantines, or uploads the file itself.
 
-## What it checks
+## Features
 
-- **Double extension spoofing** — flags files disguised like `invoice.pdf.exe`
-- **Dangerous file types** — flags extensions like `.exe`, `.bat`, `.dll`, `.js`, etc.
-- **SHA-256 hash** — generates a unique fingerprint of the file
-- **Digital signature** — checks if a `.exe` is signed by a verified publisher (Windows only)
-- **VirusTotal lookup** — checks if the file's hash has already been scanned and flagged by antivirus engines
-- **Overall Risk Level** — combines all of the above into one rating: Low, Medium, High, or Extreme
+- Detects suspicious double extensions such as `invoice.pdf.exe`
+- Recognizes potentially dangerous final extensions such as `.exe`, `.bat`, `.dll`, `.js`, and `.ps1`
+- Computes a SHA-256 hash by reading the file in 4096-byte chunks
+- Checks `.exe` Authenticode status on Windows with PowerShell
+- Queries VirusTotal using the SHA-256 hash
+- Supports both command-line and Tkinter graphical operation
+- Scans a complete folder and reports the highest calculated risk level
 
 ## Project structure
 
-```
-main.py             # CLI entry point and scan pipeline
-gui.py              # Tkinter graphical interface
-hashing.py          # SHA-256 hashing
-extensioncheck.py   # dangerous-extension and double-extension checks
-sigcheck.py         # Windows digital signature check
-virustotalcheck.py  # VirusTotal API lookup
-config.py           # risk scores, thresholds, and GUI colors
-.env                # local VirusTotal API key (create this; do not commit it)
-```
-
-`learningtkinter.py` is a local learning file and is excluded by `.gitignore`.
+| File | Purpose |
+| --- | --- |
+| `main.py` | Main scan pipeline, risk scoring, CLI, and folder scanning |
+| `gui.py` | Tkinter interface for selecting files/folders and displaying results |
+| `config.py` | Risk points, thresholds, GUI colors, and risk ordering |
+| `extensioncheck.py` | Final-extension and double-extension checks |
+| `hashing.py` | SHA-256 calculation |
+| `sigcheck.py` | Windows Authenticode signature lookup |
+| `virustotalcheck.py` | VirusTotal API request and response handling |
+| `maketestfile.py` | Small helper that creates a test file named `test'file.exe` |
+| `learningtkinter.py` | Earlier Tkinter learning version; not the current GUI |
+| `.env` | Local API key; private and never committed |
 
 ## Setup
 
-### 1. Install dependencies
+Create or activate a virtual environment, then install the dependencies:
 
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 ```
-pip install requests python-dotenv
-```
 
-### 2. Get a free VirusTotal API key
+Create `.env` in this folder:
 
-1. Go to [virustotal.com](https://www.virustotal.com) and create a free account
-2. Click your profile icon (top right) and open **API Key**
-3. Copy the key shown there
-
-The free tier is limited to about 4 requests per minute, which is plenty for scanning files one at a time.
-
-### 3. Set up your `.env` file
-
-In the same folder as `main.py`, create a file named exactly `.env` (no `.txt` extension, check Windows isn't hiding it) with this single line:
-
-```
+```text
 VT_API_KEY=your_actual_key_here
 ```
 
-No quotes, no spaces around the `=`. Never commit this file to GitHub, it should stay private. Add a `.gitignore` with `.env` in it if you're pushing this project to a repo.
+The API key must remain private. Do not commit `.env`.
 
-## Usage
+## Running the application
 
-Run the command-line scanner and enter a file or folder path when prompted:
+Command line:
 
-```
+```powershell
 python main.py
 ```
 
-```
-Please enter file or folder path: C:\Users\you\Downloads\somefile.exe
-```
+The program asks for a path. If the path is a directory, every file below it is scanned; otherwise one file is scanned.
 
-To use the graphical interface instead:
+Graphical interface:
 
-```
+```powershell
 python gui.py
 ```
 
-Choose a file or folder, then select **Start scan**. A folder scan displays the risk level for each file and the highest risk level found.
+Choose a file or folder, then press **Start scan**. The text area shows the individual checks. For a folder, the risk label shows the worst risk and a count for each level.
+
+## Scan flow
+
+1. `main.py` validates that the path exists and is a file.
+2. `extensioncheck.py` checks the filename and final extension.
+3. `hashing.py` reads the file as bytes and calculates SHA-256.
+4. `sigcheck.py` checks Authenticode only for `.exe` files on Windows.
+5. `virustotalcheck.py` sends the hash to `https://www.virustotal.com/api/v3/files/{hash}`.
+6. `riskAnalyze()` adds points from the results and maps the total to a label.
+7. The result is printed through the supplied `output` function. The GUI supplies `outputGui`, while the CLI uses `print`.
+
+## VirusTotal result meanings
+
+VirusTotal is a **hash lookup**, not a local scan of the Python source. It does not receive the file from this program.
+
+| Response | Meaning in this project |
+| --- | --- |
+| `200`, malicious or suspicious count above zero | `Flagged` |
+| `200`, malicious and suspicious counts are zero | `Clean` according to the latest VT analysis |
+| `404` | `Unknown file`; the exact hash is not in VT's database |
+| No API key | `Skipped (NO API KEY)` |
+| Timeout, network failure, rate limit, invalid response, or other status | An `Error: ...` message |
+
+`Unknown` must not be interpreted as clean. A newly created file can be unknown, but a fresh file may also return clean if the exact same bytes and hash have already been submitted to VirusTotal. The detailed `Global threat DB` line is the authoritative VT status; `Overall Risk Level: Low` is only the combined local score and is not a guarantee of safety.
+
+## Risk scoring
+
+The current values are defined in `config.py`:
+
+| Indicator | Points |
+| --- | ---: |
+| Dangerous extension without a valid `.exe` signature | 1 |
+| Double extension | 2 |
+| Invalid/missing executable signature | 2 |
+| VirusTotal flagged | 3 |
+| VirusTotal unknown | 1 |
+
+Scores are mapped as follows:
+
+- **Low:** 0–1
+- **Medium:** 2
+- **High:** 3–5
+- **Extreme:** 6 or more
+
+An `.exe` with a valid signature avoids both the dangerous-extension point and the signature point. Non-executable files receive `N/A` for signature checking and are not penalized for lacking an executable signature.
 
 Example output:
 
@@ -91,23 +127,25 @@ Overall Risk Level: Medium
 Done. This tool only reads and reports; no files were changed.
 ```
 
-## Notes
+## Error handling and limitations
 
-- The digital signature check only works on Windows, since it relies on PowerShell's `Get-AuthenticodeSignature` cmdlet
-- This tool is read-only: it never deletes, moves, quarantines, or modifies any file it scans
-- A "Low" risk result doesn't guarantee a file is safe, it just means none of the checks above found anything suspicious
-- VirusTotal lookups are skipped when `VT_API_KEY` is missing
-- VirusTotal timeouts, connection failures, rate limits, invalid responses, and unexpected status codes are reported without stopping the whole scan
-- If a file cannot be read, hashed, or inspected, the scanner reports the problem and continues with the next file during a folder scan
+- The signature check depends on Windows PowerShell and `Get-AuthenticodeSignature`.
+- A VirusTotal result is based on the hash and available historical analysis; it is not a guarantee that a file is safe.
+- VirusTotal requests can be skipped without an API key and may be limited by the free API quota.
+- Hashing and metadata failures are reported. Folder scans continue with other files when possible.
+- Extension checks are filename-based and do not inspect file contents.
+- `maketestfile.py` creates text containing `dummy content` with an `.exe` name; it is not a real executable or malware sample.
 
-## Risk scoring
+## Example output
 
-The scanner adds points for suspicious indicators:
+```text
+File: somefile.exe
+Size: 152064 bytes
+Double extension: None
+Dangerous file type: Yes
+SHA-256 hash: 3a7bd3e2360a3d...
+Digital signature status: Valid
+Global threat DB: Clean
 
-- Dangerous file extension: 1 point, unless the executable has a valid signature
-- Double extension: 2 points
-- Missing or invalid executable signature: 2 points
-- VirusTotal flagged result: 3 points
-- VirusTotal unknown result: 1 point
-
-The total score is reported as **Low** (0–1), **Medium** (2), **High** (3–5), or **Extreme** (6 or more).
+Overall Risk Level: Medium
+```
